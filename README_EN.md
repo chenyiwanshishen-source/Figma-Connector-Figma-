@@ -77,12 +77,6 @@ node server.mjs
 
 Defaults to `127.0.0.1:8788`, localhost-only; exposes only `figma_run_js`.
 
-To expose all legacy tools for debugging:
-
-```bash
-FIGMA_WRITER_RUN_JS_ONLY=0 node server.mjs
-```
-
 ### 2. Install the plugin in Figma manually (important)
 
 Figma plugins must be imported from this repo's `manifest.json` manually:
@@ -96,9 +90,9 @@ Figma plugins must be imported from this repo's `manifest.json` manually:
 
 > Once "Start / 开始" is active and the status shows "Waiting…", the plugin is connected. All reads/writes the AI pushes via MCP will then apply to the file you currently have open.
 
-### 3. Configure the MCP client (WorkBuddy / Claude)
+### 3. Configure your MCP client
 
-This server is a long-running HTTP service, so the MCP config points at the **Streamable HTTP** endpoint:
+This server is a long-running HTTP service, so point your MCP client's config at the **Streamable HTTP** endpoint:
 
 ```json
 {
@@ -111,8 +105,7 @@ This server is a long-running HTTP service, so the MCP config points at the **St
 }
 ```
 
-- WorkBuddy: open the custom-connectors entry in the left sidebar and write it into `~/.workbuddy/mcp.json` (no dot prefix).
-- Claude Desktop: run `node install_claude_3p_connector.mjs` in the repo; it writes the desktop config automatically (restart Claude after).
+Add this to your MCP client's configuration file (the exact path varies by client — check your client's MCP documentation).
 
 ---
 

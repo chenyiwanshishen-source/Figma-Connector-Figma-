@@ -80,12 +80,6 @@ node server.mjs
 
 启动后默认 `127.0.0.1:8788`，仅本机可达，默认暴露唯一工具 `figma_run_js`。
 
-需要调试、临时暴露全部旧工具时（命令行方式）：
-
-```bash
-FIGMA_WRITER_RUN_JS_ONLY=0 node server.mjs
-```
-
 ### 2. 在 Figma 中手动安装插件（重点）
 
 Figma 插件需要手动导入本仓库的 `manifest.json`，步骤如下：
@@ -99,7 +93,7 @@ Figma 插件需要手动导入本仓库的 `manifest.json`，步骤如下：
 
 > 只要「开始」亮起、状态显示「等待任务…」即说明插件已接入。之后 AI 通过 MCP 下发的所有读写任务都会作用在你当前打开的这个文件上。
 
-### 3. 配置 MCP 客户端（以 WorkBuddy / Claude 为例）
+### 3. 配置 MCP 客户端
 
 本服务是常驻 HTTP 服务，MCP 配置应指向 **Streamable HTTP** 端点：
 
@@ -114,8 +108,7 @@ Figma 插件需要手动导入本仓库的 `manifest.json`，步骤如下：
 }
 ```
 
-- WorkBuddy：打开左侧栏「专家」→「自定义连接器」写入 `~/.workbuddy/mcp.json`（注意是 `.workbuddy` 无点前缀的 `mcp.json`）。
-- Claude 桌面端：可直接运行仓库里的 `node install_claude_3p_connector.mjs`，会自动写入桌面端配置（需重启 Claude）。
+将以上 JSON 写入你所使用的 MCP 客户端的配置文件即可（具体路径因客户端而异，请参考对应客户端的 MCP 配置文档）。
 
 ---
 
