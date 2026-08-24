@@ -266,7 +266,7 @@
           remove: "Delete",
           serverWaiting: "Server: {url}. Waiting for jobs...",
           detecting: "Locating server...",
-          serverNotFound: "Server not found (ports 8788-8797). Start it first, then click here to retry.",
+          serverNotFound: "Server not found (ports 8788-8827). Start it first, then click here to retry.",
           aiWorking: "AI agent is writing (job {id})...",
           aiReading: "AI agent is reading (job {id})...",
           uptime: "Uptime: {time}",
@@ -295,7 +295,7 @@
           remove: "删除",
           serverWaiting: "服务地址：{url}，等待任务…",
           detecting: "正在定位服务…",
-          serverNotFound: "找不到服务（已尝试 8788-8797 端口），请先启动服务，然后点这里重试。",
+          serverNotFound: "找不到服务（已尝试 8788-8827 端口），请先启动服务，然后点这里重试。",
           aiWorking: "当前AI写入中…（任务 {id}）",
           aiReading: "当前AI读取中…（任务 {id}）",
           uptime: "运行时间：{time}",
@@ -349,7 +349,7 @@
         const saved = (safeStorage.get("figmaWriterServerUrl") || "").trim().replace(/\/+$/, "");
         const candidates = [];
         if (saved) candidates.push(saved);
-        for (let p = 8788; p <= 8797; p++) candidates.push(`http://localhost:${p}`);
+        for (let p = 8788; p <= 8827; p++) candidates.push(`http://localhost:${p}`);
         for (const base of candidates) {
           try {
             const res = await fetch(`${base}/health`, { method: "GET" });
