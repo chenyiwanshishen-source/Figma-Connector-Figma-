@@ -6,16 +6,9 @@
 
 ---
 
-## 1. What problem does this solve?
+## 1. About
 
-Existing AI ↔ Figma solutions are mostly **read-only** (official MCP, Dev Mode) — they can parse and read, but cannot edit designs.
-
-**Figma Connector** is a **universal, writable Figma bridge** — not tied to any single AI product, usable by any client that can send MCP requests; ships with its own Figma plugin panel for visual status and operations.
-- **What if it breaks something?** Every write snapshots the document first; if a job throws, newly created nodes are auto-removed (rollback).
-- **How does the AI know which file to operate on?** Paste a Figma file link in the plugin panel and mark it active; the plugin reports that file identity to the server while polling so the agent can read/write accordingly.
-- **How to jump to a node?** Each link row has an "Aim" button that parses the `node-id`, switches to the node's page, zooms to fit, and selects it.
-
-The design philosophy is **local-first and auditable**: the whole pipeline runs on your machine (`127.0.0.1`), requires no external API key or OAuth, and the code is small enough to fully review.
+Figma Connector is a local MCP server + Figma plugin combo that lets any desktop AI assistant read and write your open Figma files via standard MCP protocol. The entire pipeline runs locally (`127.0.0.1`) with no external API or cloud dependency.
 
 ---
 
