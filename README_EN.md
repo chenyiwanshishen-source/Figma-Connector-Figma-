@@ -92,7 +92,9 @@ Figma plugins must be imported from this repo's `manifest.json` manually:
 
 ### 3. Configure your MCP client
 
-This server is a long-running HTTP service, so point your MCP client's config at the **Streamable HTTP** endpoint:
+Normally, once the local service is reachable and the Figma plugin is installed, your client connects automatically — no extra config needed.
+
+If it doesn't, add the following config manually in your MCP client (point the URL at the actual port):
 
 ```json
 {
@@ -105,9 +107,7 @@ This server is a long-running HTTP service, so point your MCP client's config at
 }
 ```
 
-Add this to your MCP client's configuration file (the exact path varies by client — check your client's docs).
-
-> In the normal case, once the service is reachable and the Figma plugin is installed, your client connects automatically — no extra config needed. If it doesn't, add the JSON above manually in your client, pointing the URL at `http://localhost:<port>/mcp` (use the actual port printed in the server startup log, e.g. `http://localhost:8788/mcp`).
+> Default port is `8788`. If it is busy, the server automatically uses a later port; the startup log shows the real address. Update the port in the URL above if it changes.
 
 ---
 
@@ -149,7 +149,6 @@ Before every `figma_run_js`, the bridge snapshots document nodes; on error it re
 |---|---|---|
 | `PORT` | `8788` | HTTP port for the MCP server. |
 | `HOST` | `127.0.0.1` | Bind address. Keep loopback unless you know what you are doing. |
-| `FIGMA_WRITER_RUN_JS_ONLY` | `1` | `1` exposes only `figma_run_js`; `0` exposes all legacy tools. |
 | `FIGMA_WRITER_TOKEN` | empty | When set, `/mcp` and `/plugin/*` require this token (Bearer header or `?token=`). |
 | `FIGMA_WRITER_STRICT` | empty | `1` enables single-plugin exclusive mode to avoid multi-window conflicts. |
 
