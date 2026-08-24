@@ -4,6 +4,8 @@
 >
 > Works with most desktop AI assistants — connect via standard MCP and they can read and write Figma files.
 
+> 🌐 Language: [中文](./README.md) | English
+
 ---
 
 ## 1. About
