@@ -1,0 +1,22 @@
+{
+  "name": "Writable Figma MCP Bridge V2",
+  "id": "writable-figma-mcp-bridge-v2",
+  "api": "1.0.0",
+  "main": "code.js",
+  "ui": "ui.html",
+  "documentAccess": "dynamic-page",
+  "editorType": ["figma", "dev"],
+  "capabilities": ["inspect"],
+  "permissions": ["teamlibrary"],
+  "menu": [
+    {
+      "name": "Open Bridge",
+      "command": "open"
+    }
+  ],
+  "networkAccess": {
+    "allowedDomains": ["http://localhost:8788"],
+    "devAllowedDomains": ["http://localhost:8788"],
+    "reasoning": "The plugin polls the local writable MCP server for render jobs."
+  }
+}

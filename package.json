@@ -1,0 +1,21 @@
+{
+  "name": "writable-figma-mcp-bridge",
+  "version": "1.1.0",
+  "description": "Local MCP server plus Figma plugin that lets AI agents read and write Figma files, with figma_run_js as the trusted writer entrypoint.",
+  "type": "module",
+  "main": "server.mjs",
+  "scripts": {
+    "start": "node server.mjs"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "license": "MIT",
+  "keywords": [
+    "figma",
+    "mcp",
+    "plugin",
+    "design-system",
+    "automation"
+  ]
+}

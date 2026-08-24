@@ -1,0 +1,247 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8" />
+    <style>
+      body {
+        margin: 0;
+        padding: 16px;
+        font: 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+        color: #111827;
+      }
+      button {
+        border: 0;
+        border-radius: 6px;
+        background: #2563eb;
+        color: white;
+        cursor: pointer;
+        font-weight: 600;
+        padding: 8px 10px;
+      }
+      button.secondary {
+        background: #e5e7eb;
+        color: #111827;
+      }
+      textarea {
+        box-sizing: border-box;
+        width: 100%;
+        min-height: 180px;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        margin-top: 12px;
+        padding: 10px;
+      }
+      .row {
+        display: flex;
+        gap: 8px;
+        margin-bottom: 12px;
+      }
+      input[type="text"] {
+        box-sizing: border-box;
+        flex: 1;
+        min-width: 0;
+        border: 1px solid #d1d5db;
+        border-radius: 6px;
+        font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        padding: 7px 8px;
+      }
+      .status {
+        color: #4b5563;
+        line-height: 1.45;
+        margin-top: 10px;
+        white-space: pre-wrap;
+      }
+    </style>
+  </head>
+  <body>
+    <div class="row">
+      <button id="toggle">Start polling</button>
+      <button id="clear" class="secondary">Clear queue</button>
+      <button id="render" class="secondary">Render pasted JSON</button>
+    </div>
+    <div class="row">
+      <input type="text" id="fileUrl" placeholder="Figma file URL (optional, identifies this file)" />
+      <input type="text" id="token" placeholder="Server token (optional)" />
+    </div>
+    <div class="status" id="status">Server: http://localhost:8788</div>
+    <textarea id="spec" placeholder="Paste a design spec JSON here for manual testing."></textarea>
+
+    <script>
+      window.onerror = (message, source, lineno, colno) => {
+        const el = document.getElementById("status");
+        if (el) el.textContent = `UI error: ${message}\n${source}:${lineno}:${colno}`;
+      };
+      const server = "http://localhost:8788";
+      const statusEl = document.getElementById("status");
+      const toggleEl = document.getElementById("toggle");
+      const clearEl = document.getElementById("clear");
+      const specEl = document.getElementById("spec");
+      const renderEl = document.getElementById("render");
+      const fileUrlEl = document.getElementById("fileUrl");
+      const tokenEl = document.getElementById("token");
+      // localStorage can throw in Figma's sandboxed plugin iframe; never let it kill the script.
+      const safeStorage = {
+        get(key) {
+          try { return localStorage.getItem(key); } catch (error) { return null; }
+        },
+        set(key, value) {
+          try { localStorage.setItem(key, value); } catch (error) {}
+        },
+      };
+      fileUrlEl.value = safeStorage.get("figmaWriterFileUrl") || "";
+      tokenEl.value = safeStorage.get("figmaWriterToken") || "";
+      fileUrlEl.addEventListener("change", () => safeStorage.set("figmaWriterFileUrl", fileUrlEl.value.trim()));
+      tokenEl.addEventListener("change", () => safeStorage.set("figmaWriterToken", tokenEl.value.trim()));
+      function withToken(urlString) {
+        const token = tokenEl.value.trim();
+        if (!token) return urlString;
+        const sep = urlString.indexOf("?") >= 0 ? "&" : "?";
+        return `${urlString}${sep}token=${encodeURIComponent(token)}`;
+      }
+      let polling = false;
+      let timer = null;
+      let pollInFlight = false;
+      let pluginInfo = {
+        pluginId: `figma-writer-ui-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
+        fileName: "",
+        pageName: "",
+      };
+
+      function setStatus(text) {
+        statusEl.textContent = text;
+      }
+
+      async function postResult(id, result) {
+        await fetch(withToken(`${server}/plugin/result`), {
+          method: "POST",
+          headers: { "Content-Type": "application/json" },
+          body: JSON.stringify(Object.assign({ id, pluginId: pluginInfo.pluginId }, result)),
+        });
+      }
+
+      async function poll() {
+        if (!polling || pollInFlight) return;
+        pollInFlight = true;
+        try {
+          const params = new URLSearchParams({
+            pluginId: pluginInfo.pluginId,
+            fileName: pluginInfo.fileName || "",
+            pageName: pluginInfo.pageName || "",
+            fileUrl: fileUrlEl.value.trim(),
+          });
+          const res = await fetch(withToken(`${server}/plugin/job?${params.toString()}`));
+          if (res.status === 401) {
+            setStatus("Auth failed: the server requires a token. Enter it in the token field above.");
+            return;
+          }
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          const job = await res.json();
+          if (job && job.rejected) {
+            setStatus(`Idle: ${job.reason || "another plugin owns the queue"}`);
+          } else if (job && job.id) {
+            const toolName = String(job.toolName || "");
+            const isRenderJob =
+              toolName === "create_figma_canvas_from_spec" ||
+              toolName === "create_portfolio_overview_page";
+            setStatus(`${isRenderJob ? "Rendering" : "Running"} job ${job.id} (${job.toolName})...`);
+            parent.postMessage(
+              {
+                pluginMessage: {
+                  type: isRenderJob ? "render-spec" : "tool-call",
+                  id: job.id,
+                  toolName: job.toolName,
+                  spec: job.spec,
+                  args: job.spec,
+                },
+              },
+              "*",
+            );
+          } else {
+            setStatus(`Polling. Waiting for jobs...\n${new Date().toLocaleTimeString()}`);
+          }
+        } catch (error) {
+          setStatus(`Polling error: ${error.message}`);
+        } finally {
+          pollInFlight = false;
+          if (polling) timer = setTimeout(poll, 1000);
+        }
+      }
+
+      function stopPolling(message = "Stopped.") {
+        polling = false;
+        pollInFlight = false;
+        toggleEl.textContent = "Start polling";
+        if (timer) clearTimeout(timer);
+        timer = null;
+        setStatus(message);
+      }
+
+      toggleEl.onclick = () => {
+        if (polling) {
+          stopPolling("Polling stopped.");
+          return;
+        }
+        polling = true;
+        toggleEl.textContent = "Stop polling";
+        if (polling) poll();
+      };
+
+      clearEl.onclick = async () => {
+        try {
+          stopPolling("Clearing queue...");
+          const res = await fetch(withToken(`${server}/plugin/clear`), { method: "POST" });
+          if (!res.ok) throw new Error(`HTTP ${res.status}`);
+          setStatus("Queue cleared. Polling is stopped.");
+        } catch (error) {
+          setStatus(`Clear queue error: ${error.message}`);
+        }
+      };
+
+      renderEl.onclick = () => {
+        try {
+          const spec = JSON.parse(specEl.value);
+          parent.postMessage(
+            { pluginMessage: { type: "render-spec", id: "manual", spec } },
+            "*",
+          );
+        } catch (error) {
+          setStatus(`Invalid JSON: ${error.message}`);
+        }
+      };
+
+      window.onmessage = async (event) => {
+        const message = event.data.pluginMessage;
+        if (!message) return;
+        if (message.type === "bridge-info") {
+          pluginInfo.pluginId = message.pluginId || pluginInfo.pluginId;
+          pluginInfo.fileName = message.fileName || "";
+          pluginInfo.pageName = message.pageName || "";
+        }
+        setStatus(message.message || JSON.stringify(message));
+        if (message.id && message.id !== "manual") {
+          await postResult(message.id, {
+            ok: message.ok,
+            message: message.message,
+            data: message.data,
+            stack: message.stack,
+          });
+        }
+      };
+
+      window.onerror = (message, source, lineno, colno) => {
+        setStatus(`UI error: ${message}\n${source}:${lineno}:${colno}`);
+      };
+
+      window.onunhandledrejection = (event) => {
+        const reason = event.reason && event.reason.message ? event.reason.message : event.reason;
+        setStatus(`UI promise error: ${reason}`);
+      };
+
+      window.addEventListener("beforeunload", () => {
+        if (timer) clearTimeout(timer);
+        polling = false;
+      });
+    </script>
+  </body>
+</html>
