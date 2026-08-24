@@ -105,9 +105,9 @@ This server is a long-running HTTP service, so point your MCP client's config at
 }
 ```
 
-Add this to your MCP client's configuration file (the exact path varies by client — check your client's MCP documentation).
+Add this to your MCP client's configuration file (the exact path varies by client — check your client's docs).
 
-> Default port is `8788`. If it is busy, the server automatically moves to `8789`, `8790`, … (up to 50 ports later), and the startup log shows the real address (`MCP endpoint: http://127.0.0.1:<port>/mcp`). **If the port changes, update the port in the config above** — the Figma plugin panel auto-detects these ports, but the MCP client does not, so it must be set manually.
+> In the normal case, once the service is reachable and the Figma plugin is installed, your client connects automatically — no extra config needed. If it doesn't, add the JSON above manually in your client, pointing the URL at `http://localhost:<port>/mcp` (use the actual port printed in the server startup log, e.g. `http://localhost:8788/mcp`).
 
 ---
 
