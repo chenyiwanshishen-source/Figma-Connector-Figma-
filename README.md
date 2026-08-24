@@ -1,107 +1,185 @@
-# Writable Figma MCP Bridge V2
+# Writable Figma MCP Bridge（Figma 连接器）
 
-Writable Figma MCP Bridge is a local, no-auth MCP server plus a companion Figma plugin. It is designed to run on `127.0.0.1` / `localhost` and does not require an API key or OAuth token.
+> 给**任何 MCP 兼容的 AI 客户端**提供在 Figma 沙箱内执行任意 JS 的通用写入通道 —— 本地、无云服务、默认仅本机可达。
+>
+> 适用于大多数桌面端 AI 助手，通过标准 MCP 接入后即可读写 Figma 文件。
 
-1. Claude calls `figma-writer` over MCP at `http://localhost:8788/mcp`.
-2. The MCP server queues a render job.
-3. The Figma plugin polls the server.
-4. The plugin reads or writes the current Figma file through safe operations.
+---
 
-## Security model
+## 一、这个工具解决什么问题
 
-- No authentication is required by default.
-- The MCP server listens on `127.0.0.1` unless `HOST` is explicitly changed.
-- Do not expose this server on `0.0.0.0` or a public network unless you set `FIGMA_WRITER_TOKEN` (see Environment variables).
-- The Claude connector installer pre-allows the known writer tools so local use does not require repeated tool approval prompts.
+市面上已有的 AI ↔ Figma 方案分两类：
 
-## Environment variables
+1. **只读方案**（Figma 官方 MCP、Dev Mode MCP）—— 只能解析/读取，不能改写设计稿。
+2. **特定产品内置方案**（Claude 桌面端、Codex 等）—— 部分支持写入，但绑定特定产品，且通常缺少「插件面板内的可视化交互」（状态显示、链接管理、瞄准跳转等）。
 
-| Variable | Default | Effect |
-| --- | --- | --- |
-| `PORT` | `8788` | HTTP port for the MCP server. |
-| `HOST` | `127.0.0.1` | Bind address. Keep it loopback unless you know what you are doing. |
-| `FIGMA_WRITER_RUN_JS_ONLY` | `1` | `1` exposes only `figma_run_js`; `0` exposes all legacy tools. |
-| `FIGMA_WRITER_TOKEN` | empty | When set, `/mcp` and `/plugin/*` require this token (Bearer header or `?token=`). Enter the same token in the plugin UI token field. |
-| `FIGMA_WRITER_STRICT` | empty | `1` enables strict single-plugin mode: only the first polling plugin receives jobs, others are rejected with a reason. |
+**Writable Figma MCP Bridge** 的定位是第三条路：**通用的、可写入的 Figma 桥接** —— 不绑定某个 AI 产品，任何能发 MCP 请求的客户端都能用；同时自带一个 Figma 插件面板，提供可视化状态和操作。
 
-## Reliability features
+它解决的核心痛点：
 
-- **Error stacks**: failures from `figma_run_js` include the JavaScript stack, including line numbers in the submitted code.
-- **Automatic rollback**: before each `figma_run_js` job the bridge snapshots all node ids in the document. If the job throws, every node created by that job is removed automatically and the error message reports how many nodes were rolled back. Pass `rollback: false` in the tool arguments to disable this for a specific job. Note: rollback removes newly created nodes only; edits to pre-existing nodes are not reverted (use Figma's Undo for those).
-- **File identity**: paste the Figma file URL into the plugin UI field. `GET /health` then reports exactly which file the polling plugin is attached to, which removes ambiguity when two files have the same name.
-- **Multi-plugin warning**: when more than one plugin window is polling, every tool result is annotated with a warning naming all pollers and the plugin that received the job.
+- **AI 能不能改我的设计文件？** 能。通过 `figma_run_js` 在 Figma 沙箱里执行一段 JS，对当前打开的文件做任意读取与写入（创建节点、改样式、绑变量、套组件）。
+- **改坏了怎么办？** 每次写入前自动快照文档，任务抛错会自动删除本次新建的节点（撤销式回滚）。
+- **怎么告诉 AI 要操作哪个文件？** 在插件面板粘贴 Figma 文件链接并设为「当前链接」，插件轮询时把这个文件标识上报给服务端，Agent 即可据此读写。
+- **如何让 AI 跳转到某个节点？** 面板每条链接旁有「瞄准」按钮，一键解析 `node-id`、切换页面、居中放大并选中该节点。
 
-## Run the server
+设计理念是 **「本地优先、可审计」**：整个链路只跑在你的机器上（`127.0.0.1`），不依赖任何外部 API Key 或 OAuth，代码量小、可完全审查。
+
+---
+
+## 二、核心特性
+
+- **可写 MCP 桥接**：把 `figma_run_js` 作为可信写入入口暴露给 MCP 客户端。
+- **安全写入**：每次任务前快照节点，出错自动回滚本次新建节点。
+- **设计系统优先**：内置 `helpers`（设计系统索引、组件导入、变量绑定、样式应用等），避免硬编码。
+- **状态可视化**：面板实时显示「等待任务 / 读取中 / 写入中」三种状态（蓝色=写入、绿色=读取）。
+- **瞄准按钮**：每条链接一键跳转并选中目标节点（自适应缩放）。
+,
+- **重复链接提示**：粘贴已有链接时底部浮窗提示「当前链接已存在」，避免误操作。
+- **多插件保护**：`GET /health` 列出所有轮询窗口，`FIGMA_WRITER_STRICT=1` 可强制单窗口独占，避免多窗口写错文件。
+
+---
+
+## 三、工作原理
+
+```
+AI 客户端 (Claude / WorkBuddy)
+        │  MCP (http://localhost:8788/mcp)
+        ▼
+本地 MCP 服务 (server.mjs)  ── 任务入队
+        │
+        ▲ 轮询 GET /plugin/job
+        │
+Figma 插件 (code.js 运行在 Figma 沙箱)  ── 在 Figma 内执行读/写
+        │ 结果 POST /plugin/result
+        ▼
+本地 MCP 服务  ── 把结果回传给 AI
+```
+
+1. AI 通过 MCP 调用服务端（`http://localhost:8788/mcp`）。
+2. 服务端把任务入队。
+3. Figma 插件轮询 `/plugin/job`，取出任务并在 Figma 内执行（只允许操作**当前打开的文件**）。
+4. 插件通过 `POST /plugin/result` 回传结果给 AI。
+
+> ⚠️ 插件的真实读写边界是「Figma 当前打开的文档」。面板选中的链接用于标识「声明在操作哪个文件」并上报给服务端/AI，两者不一致时读写仍以当前打开的文件为准。
+
+---
+
+## 四、环境要求
+
+- **Node.js ≥ 18**（运行本地 MCP 服务必需，[nodejs.org](https://nodejs.org) 下载安装）。
+- **Figma 桌面端**（Web 版不支持本地插件/dev 模式）。
+- 无需 API Key、无需 OAuth、无需联网（服务只跑在 `127.0.0.1`）。
+
+## 五、快速开始
+
+### 1. 启动本地服务
+
+**方式 A：命令行（推荐，便于看日志）**
 
 ```bash
 cd writable-figma-mcp-bridge
 node server.mjs
 ```
 
-By default the server is in run-js-only mode and exposes only `figma_run_js` to Claude. To expose all legacy tools for debugging:
+**方式 B：双击启动器**
+
+- macOS：双击仓库里的 `start.command`
+- Windows：双击 `start.bat`
+
+> 双击脚本会以「最小化/后台」方式启动 `node server.mjs`，无需敲命令。前提是本机已安装 Node.js。
+
+启动后默认 `127.0.0.1:8788`，仅本机可达，默认暴露唯一工具 `figma_run_js`。
+
+需要调试、临时暴露全部旧工具时（命令行方式）：
 
 ```bash
 FIGMA_WRITER_RUN_JS_ONLY=0 node server.mjs
 ```
 
-## Install the Figma plugin
+### 2. 在 Figma 中手动安装插件（重点）
 
-In Figma Desktop:
+Figma 插件需要手动导入本仓库的 `manifest.json`，步骤如下：
 
-1. Open a Figma design file.
-2. Go to `Plugins -> Development -> Import plugin from manifest...`.
-3. Choose this repository's `manifest.json`.
-4. Run `Plugins -> Development -> Writable Figma MCP Bridge V2`.
-5. Click `Start polling`.
+1. 打开 **Figma 桌面端**（官方支持 macOS / Windows）。
+2. 打开任意一个 Figma 设计文件。
+3. 顶部菜单：`Plugins（插件）` → `Development（开发）` → `Import plugin from manifest…（从清单导入插件…）`。
+4. 在文件选择框里选中本仓库的 **`manifest.json`**（位于 `writable-figma-mcp-bridge/manifest.json`）。
+5. 菜单 `Plugins（插件）` → `Development（开发）` → `Writable Figma MCP Bridge` 运行它。
+6. 在弹出的面板点击 **「开始」**，让它连上本地服务。
 
-## Install the Claude 3P connector
+> 只要「开始」亮起、状态显示「等待任务…」即说明插件已接入。之后 AI 通过 MCP 下发的所有读写任务都会作用在你当前打开的这个文件上。
 
-```bash
-cd writable-figma-mcp-bridge
-node install_claude_3p_connector.mjs
+### 3. 配置 MCP 客户端（以 WorkBuddy / Claude 为例）
+
+本服务是常驻 HTTP 服务，MCP 配置应指向 **Streamable HTTP** 端点：
+
+```json
+{
+  "mcpServers": {
+    "figma-writer": {
+      "type": "http",
+      "url": "http://localhost:8788/mcp"
+    }
+  }
+}
 ```
 
-Then fully quit and reopen Claude.
+- WorkBuddy：打开左侧栏「专家」→「自定义连接器」写入 `~/.workbuddy/mcp.json`（注意是 `.workbuddy` 无点前缀的 `mcp.json`）。
+- Claude 桌面端：可直接运行仓库里的 `node install_claude_3p_connector.mjs`，会自动写入桌面端配置（需重启 Claude）。
 
-## Test prompt
+---
 
-Ask Claude:
+## 六、功能说明
 
-```text
-Use figma-writer figma_run_js to inspect the current design system with helpers.indexDesignSystem(), then return the first 10 local components, text styles, paint styles, and variables. Do not modify the file.
-```
+### 链接管理
+- 在顶部输入框粘贴 Figma 文件链接，点「添加」即可加入下方列表。
+- 每行可「选中」作为当前活跃链接（轮询时上报给服务端），并带「瞄准」按钮。
+- 粘贴重复链接时，底部会滑出红色浮窗提示「当前链接已存在」。
 
-## Exposed tool
+### 瞄准按钮（Aim）
+每行链接右侧的十字准星图标：点击后解析链接里的 `node-id`，切换到该节点所在页面，自动居中放大并选中它。若链接指向其他文件（当前打开文件里找不到该节点），会明确提示「链接可能指向其他文件」。
 
-The default server mode exposes only one tool to Claude:
+### 状态指示
+面板右上角状态点随任务变化：
+- **灰色**「等待任务…」：空闲
+- **蓝色**「当前 AI 写入中…」：检测到写操作
+- **绿色**「当前 AI 读取中…」：检测到读操作
 
-- `figma_run_js`: advanced trusted executor, similar to a simplified `Use Figma`; run JS in the Figma plugin context.
+### 自动回滚
+每次 `figma_run_js` 前会快照文档节点；若执行抛错，自动删除本次新建的节点并报告回滚数量。对已有节点的修改不自动回滚（可用 Figma 撤销 `Cmd/Ctrl+Z`）。
 
-## Recommended workflow
+---
 
-Use `figma_run_js` for reads and writes. Keep lookup, mutation, and validation in one Figma-side pass so Claude does not pass stale node IDs between tools.
+## 七、安全
 
-Recommended order for design-system work:
+| 项 | 说明 |
+|---|---|
+| 默认无鉴权 | `FIGMA_WRITER_TOKEN` 为空时，本机任意进程都能访问 `/mcp` 并执行 `figma_run_js`（即在你打开的 Figma 文件里跑任意 JS）。 |
+| 绑定地址 | 默认 `127.0.0.1`，仅本机可达。**切勿**将 `HOST` 设为 `0.0.0.0` 暴露到公网。 |
+| 建议 | 在共享/公共机器上务必设置 `FIGMA_WRITER_TOKEN`，否则任意本机进程都可调用。 |
+| 插件沙箱 | Figma 插件运行在 Figma 沙箱内，无法读取你电脑上的密码、文件或其他应用凭证，风险边界仅限「当前打开的 Figma 文档」。 |
 
-1. `helpers.indexDesignSystem()` to inspect local components, component sets, variables, and styles.
-2. `helpers.cloneReferenceNode()` when a similar good-looking module already exists in the file.
-3. `helpers.importComponentByName()` when a library/local component should be used.
-4. `helpers.applyTextStyle()`, `helpers.applyPaintStyle()`, and `helpers.bindVariable()` instead of hardcoded font/color/spacing.
-5. `helpers.validateCanvas()` before reporting success.
+---
 
-`figma_run_js` receives:
+## 八、环境变量
 
-- `figma`: Figma Plugin API global
-- `args`: optional structured arguments from the MCP call
-- `helpers`: safe helpers exposed by this bridge
+| 变量 | 默认 | 作用 |
+|---|---|---|
+| `PORT` | `8788` | MCP 服务 HTTP 端口。 |
+| `HOST` | `127.0.0.1` | 绑定地址，保持回环地址即可。 |
+| `FIGMA_WRITER_RUN_JS_ONLY` | `1` | `1` 仅暴露 `figma_run_js`；`0` 暴露全部旧工具。 |
+| `FIGMA_WRITER_TOKEN` | 空 | 设置后 `/mcp` 与 `/plugin/*` 需校验该 token（Bearer 头或 `?token=`）。 |
+| `FIGMA_WRITER_STRICT` | 空 | `1` 开启单窗口独占模式，避免多窗口冲突。 |
 
-Available helpers:
+---
+
+## 九、可用的 helpers（在 `figma_run_js` 内可用）
+
+`figma_run_js` 会注入：`figma`（Figma API）、`args`（结构化参数）、`helpers`（安全助手）。
 
 - `helpers.loadFont(fontName)`
 - `helpers.ensureTextFontLoaded(textNode, fallbackFontName)`
-- `helpers.paint(value, theme)`
-- `helpers.hexToRgb(hex)`
-- `helpers.rgbToHex(rgb)`
+- `helpers.paint(value, theme)` / `helpers.hexToRgb(hex)` / `helpers.rgbToHex(rgb)`
 - `helpers.normalizeHex(value, theme)`
 - `helpers.findVariable(nameOrKey, resolvedType)`
 - `helpers.indexDesignSystem(options)`
@@ -110,72 +188,15 @@ Available helpers:
 - `helpers.applyTextStyle(textNode, styleName)`
 - `helpers.applyPaintStyle(node, styleName, field)`
 - `helpers.bindVariable(node, field, variableName, fallbackValue, resolvedType)`
-- `helpers.bindFillVariable(node, variableName, fallbackValue)`
-- `helpers.bindStrokeVariable(node, variableName, fallbackValue)`
-- `helpers.findNodes(selector)`
-- `helpers.getNode(id)`
-- `helpers.summarizeNode(node, depth)`
-- `helpers.inspectNodeAppearance(node)`
+- `helpers.bindFillVariable(node, variableName,  fallbackValue)` / `helpers.bindStrokeVariable(...)`
+- `helpers.findNodes(selector)` / `helpers.getNode(id)`
+- `helpers.summarizeNode(node, depth)` / `helpers.inspectNodeAppearance(node)`
 - `helpers.validateCanvas(options)`
 
-Example: update selected text and boxes in one pass:
+> 在 `figma_run_js` 的代码里避免使用可选链 `?.` 与空值合并 `??`，Figma 插件运行时可能拒绝。
 
-```json
-{
-  "code": "const selection = figma.currentPage.selection;\\nconst dateRe = /\\\\d{4}-\\\\d{2}-\\\\d{2}/;\\nlet dateCount = 0;\\nlet bodyCount = 0;\\nlet boxCount = 0;\\nfor (const node of figma.currentPage.findAll()) {\\n  if (node.type === 'TEXT') {\\n    await helpers.ensureTextFontLoaded(node);\\n    if (dateRe.test(node.characters)) {\\n      node.fontSize = 12;\\n      dateCount += 1;\\n    } else if (node.fontSize === 14) {\\n      await helpers.bindFillVariable(node, '中性色/文本/正文标题强调01', '#1A1C24');\\n      bodyCount += 1;\\n    }\\n  }\\n  if ('paddingLeft' in node && node.name.indexOf('盒子') >= 0) {\\n    node.paddingLeft = 4; node.paddingRight = 4; node.paddingTop = 4; node.paddingBottom = 4;\\n    boxCount += 1;\\n  }\\n}\\nreturn { dateCount, bodyCount, boxCount };",
-  "timeoutMs": 30000
-}
-```
+---
 
-Avoid optional chaining (`?.`) and nullish coalescing (`??`) in `figma_run_js` code because Figma's plugin runtime may reject them.
+## 十一、许可
 
-Design-system first example:
-
-```json
-{
-  "code": "const ds = await helpers.indexDesignSystem({ query: 'Button', maxItems: 20 });\\nconst button = await helpers.importComponentByName('Button', { x: 2400, y: 120, properties: args.properties || {} });\\nconst validation = helpers.validateCanvas({ scope: 'selection' });\\nreturn { ds, button, validation };",
-  "args": {
-    "properties": {
-      "Type": "Primary"
-    }
-  },
-  "timeoutMs": 30000
-}
-```
-
-Clone-reference example:
-
-```json
-{
-  "code": "const clone = await helpers.cloneReferenceNode({ nameQuery: '表格', type: 'FRAME', maxNodes: 1 }, { placement: 'right', gap: 160, name: 'Generated / Table' });\\nreturn { clone, validation: helpers.validateCanvas({ scope: 'selection' }) };",
-  "timeoutMs": 30000
-}
-```
-
-Style and token example:
-
-```json
-{
-  "code": "let changed = 0;\\nconst nodes = await helpers.findNodes({ scope: 'selection', type: 'TEXT', maxNodes: 100 });\\nfor (let i = 0; i < nodes.length; i += 1) {\\n  await helpers.ensureTextFontLoaded(nodes[i]);\\n  await helpers.applyTextStyle(nodes[i], '正文/Regular');\\n  await helpers.bindVariable(nodes[i], 'fills', '中性色/文本/正文标题强调01', '#1A1C24', 'COLOR');\\n  changed += 1;\\n}\\nreturn { changed, validation: helpers.validateCanvas({ scope: 'selection' }) };",
-  "timeoutMs": 30000
-}
-```
-
-Polling safety:
-
-- Every plugin window now registers a unique session.
-- New jobs are routed to the currently active polling plugin window.
-- `GET /health` lists every polling plugin (id, file name, page, file URL) so you can see conflicts at a glance.
-- If edits target the wrong file, stop polling in extra plugin windows and keep only the intended Figma file polling, or start the server with `FIGMA_WRITER_STRICT=1`.
-
-The Figma file must have the relevant libraries enabled. If `helpers.indexDesignSystem()` cannot see library components or variables, enable the library from Figma Assets/Libraries first, then run the plugin again.
-
-## Legacy tools
-
-The source still contains older JSON-spec and operation tools for emergency debugging, but the server hides them by default. Keep the default `node server.mjs` mode for daily use so Claude only sees `figma_run_js`.
-
-To temporarily expose the older tools:
-
-```bash
-FIGMA_WRITER_RUN_JS_ONLY=0 node server.mjs
-```
+MIT License。

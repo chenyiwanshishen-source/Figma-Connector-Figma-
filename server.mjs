@@ -4,7 +4,7 @@ import http from "node:http";
 import crypto from "node:crypto";
 
 const HOST = process.env.HOST || "127.0.0.1";
-const PORT = Number(process.env.PORT || 8788);
+const BASE_PORT = Number(process.env.PORT || 8788);
 
 const sessions = new Set();
 const pendingJobs = [];
@@ -769,7 +769,7 @@ const server = http.createServer(async (req, res) => {
       sendJson(res, 200, { ok: true });
       return;
     }
-    const url = new URL(req.url || "/", `http://${HOST}:${PORT}`);
+    const url = new URL(req.url || "/", `http://${HOST}:${BASE_PORT}`);
     if (url.pathname === "/mcp") {
       if (req.method === "GET" || req.method === "DELETE") {
         res.writeHead(405, { Allow: "POST, OPTIONS" });
@@ -789,9 +789,28 @@ const server = http.createServer(async (req, res) => {
   }
 });
 
-server.listen(PORT, HOST, () => {
-  console.log(`Writable Figma MCP server listening on http://${HOST}:${PORT}`);
-  console.log(`MCP endpoint: http://${HOST}:${PORT}/mcp`);
-  if (AUTH_TOKEN) console.log("Auth token required (FIGMA_WRITER_TOKEN is set).");
-  if (STRICT_SINGLE_PLUGIN) console.log("Strict single-plugin mode enabled (FIGMA_WRITER_STRICT=1).");
-});
+function tryListen(port) {
+  const onError = (error) => {
+    if (error.code === "EADDRINUSE" && port < BASE_PORT + 50) {
+      console.log(`Port ${port} is in use, trying ${port + 1} ...`);
+      server.removeListener("listening", onListening);
+      tryListen(port + 1);
+    } else {
+      console.error(`Failed to start server: ${error.message}`);
+      process.exit(1);
+    }
+  };
+  const onListening = () => {
+    server.removeListener("error", onError);
+    console.log(`Writable Figma MCP server listening on http://${HOST}:${port}`);
+    console.log(`MCP endpoint: http://${HOST}:${port}/mcp`);
+    if (port !== BASE_PORT) console.log(`Note: default port ${BASE_PORT} was busy, using ${port} instead. Enter this URL in the plugin's server field.`);
+    if (AUTH_TOKEN) console.log("Auth token required (FIGMA_WRITER_TOKEN is set).");
+    if (STRICT_SINGLE_PLUGIN) console.log("Strict single-plugin mode enabled (FIGMA_WRITER_STRICT=1).");
+  };
+  server.once("error", onError);
+  server.once("listening", onListening);
+  server.listen(port, HOST);
+}
+
+tryListen(BASE_PORT);

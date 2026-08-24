@@ -1,6 +1,6 @@
 console.log("[Writable Figma MCP Bridge] starting");
 const pluginSessionId = `figma-writer-${Date.now()}-${Math.floor(Math.random() * 1000000)}`;
-figma.showUI(__html__, { width: 420, height: 420 });
+figma.showUI(__html__, { width: 360, height: 170 });
 figma.ui.postMessage({
   type: "bridge-info",
   pluginId: pluginSessionId,
@@ -766,10 +766,44 @@ async function getNodeById(id) {
   return figma.getNodeById(resolvedId);
 }
 
-async function requireNode(ref, label) {
+async function requireNode(ref,  label) {
   const node = await getNodeById(ref);
   if (!node) throw new Error(`Node not found for ${label || "ref"}: ${ref}`);
   return node;
+}
+
+// Jump the Figma viewport to a node referenced by a Figma share URL.
+// Figma share URLs encode the node id as "1-2" while the plugin API uses "1:2".
+async function aimAtNode(url) {
+  url = (url || "").trim();
+  // Strip invisible / control characters that copy-paste often brings along
+  url = url.replace(/[\u200B-\u200F\uFEFF\u00AD\u0000-\u001F\u202A-\u202E]/g, "");
+  url = url.trim();
+  if (!url) return { ok: false, message: "没有链接，无法定位。" };
+  // Auto-prefix common missing protocols
+  if (!/^https?:\/\//i.test(url)) {
+    url = "https://" + url;
+  }
+  // Extract node-id via regex — avoids URL constructor issues in Figma sandbox
+  const match = url.match(/[?&]node-id=([^&#]+)/);
+  const raw = match ? decodeURIComponent(match[1]) : null;
+  if (!raw) return { ok: false, message: "该链接没有 node-id，无法定位到具体节点。" };
+  const nodeId = raw.replace(/-/g, ":");
+  const node = await getNodeById(nodeId);
+  if (!node) {
+    return { ok: false, message: "当前打开的文件里找不到该节点（链接可能指向其他文件）。" };
+  }
+  let page = node;
+  while (page && page.type !== "PAGE") page = page.parent;
+  if (page && page !== figma.currentPage && figma.setCurrentPageAsync) {
+    await figma.setCurrentPageAsync(page);
+  }
+  if (node.type === "PAGE" || node.type === "DOCUMENT") {
+    return { ok: true, message: `已切换到「${node.name}」` };
+  }
+  figma.currentPage.selection = [node];
+  figma.viewport.scrollAndZoomIntoView([node]);
+  return { ok: true, message: `已定位到「${node.name}」` };
 }
 
 function canAppend(node) {
@@ -2147,6 +2181,19 @@ let allPagesLoaded = false;
 
 figma.ui.onmessage = async (message) => {
   try {
+    if (message.type === "resize") {
+      const w = Math.max(280, Math.min(640, Math.ceil(message.width || 0)));
+      const h = Math.max(120, Math.min(640, Math.ceil(message.height || 0)));
+      figma.ui.resize(w, h);
+      return;
+    }
+
+    if (message.type === "aim-at-node") {
+      const result = await aimAtNode(message.url);
+      figma.ui.postMessage({ type: "aim-result", ok: result.ok, message: result.message });
+      return;
+    }
+
     if (message.type === "tool-call" || message.type === "read-design-system") {
       if (!allPagesLoaded && figma.loadAllPagesAsync) {
         await figma.loadAllPagesAsync();

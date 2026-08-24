@@ -5,81 +5,324 @@
     <style>
       body {
         margin: 0;
-        padding: 16px;
+        padding: 12px;
         font: 12px system-ui, -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
         color: #111827;
+        background: #ffffff;
       }
-      button {
-        border: 0;
-        border-radius: 6px;
-        background: #2563eb;
-        color: white;
-        cursor: pointer;
-        font-weight: 600;
-        padding: 8px 10px;
+      .card {
+        background: #ffffff;
+        border: 1px solid #e5e7eb;
+        border-radius: 12px;
+        box-shadow: 0 1px 2px rgba(16, 24, 40, 0.06), 0 8px 24px rgba(16, 24, 40, 0.08);
+        padding: 16px;
       }
-      button.secondary {
-        background: #e5e7eb;
-        color: #111827;
-      }
-      textarea {
-        box-sizing: border-box;
-        width: 100%;
-        min-height: 180px;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
-        font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-        margin-top: 12px;
-        padding: 10px;
-      }
-      .row {
+      .header {
         display: flex;
-        gap: 8px;
+        align-items: center;
+        justify-content: space-between;
         margin-bottom: 12px;
       }
-      input[type="text"] {
+      .title {
+        font-size: 14px;
+        font-weight: 700;
+      }
+      .headerRight {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+      }
+      .badge {
+        display: inline-flex;
+        align-items: center;
+        gap: 6px;
+        background: #f3f4f6;
+        border-radius: 999px;
+        color: #374151;
+        font-size: 11px;
+        padding: 4px 10px;
+      }
+      .dot {
+        width: 7px;
+        height: 7px;
+        border-radius: 50%;
+        background: #9ca3af;
+      }
+      .badge[data-state="connected"] .dot { background: #22c55e; }
+      .badge[data-state="writing"] .dot { background: #3b82f6; }
+      .badge[data-state="reading"] .dot { background: #10b981; }
+      .badge[data-state="error"] .dot { background: #ef4444; }
+      .iconBtn {
+        width: 26px;
+        height: 26px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #ffffff;
+        color: #374151;
+        cursor: pointer;
+        padding: 0;
+      }
+      .iconBtn:hover { background: #f9fafb; }
+      #addLink { font-size: 15px; line-height: 1; }
+      .addRow { display: flex; gap: 8px; margin-bottom: 10px; align-items: center; }
+      .addRow input[type="text"] {
         box-sizing: border-box;
         flex: 1;
         min-width: 0;
-        border: 1px solid #d1d5db;
-        border-radius: 6px;
+        border: 1px solid #e5e7eb;
+        border-radius: 8px;
+        background: #fafbfc;
         font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
-        padding: 7px 8px;
+        padding: 8px 10px;
+      }
+      .roundBtn {
+        flex: none;
+        width: 28px;
+        height: 28px;
+        border: 0;
+        border-radius: 50%;
+        cursor: pointer;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+      #confirmAdd { background: #111827; color: #ffffff; }
+      #confirmAdd:hover { background: #1f2937; }
+      #cancelAdd { background: #f3f4f6; color: #374151; }
+      #cancelAdd:hover { background: #e5e7eb; }
+      .list { display: flex; flex-direction: column; gap: 6px; margin-bottom: 10px; }
+      .linkRow {
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        border: 1px solid #eef0f3;
+        border-radius: 8px;
+        padding: 7px 10px;
+        background: #fafbfc;
+      }
+      .linkRow.active {
+        border-color: #bfdbfe;
+        background: #f5f9ff;
+      }
+      .linkRow input[type="radio"] { accent-color: #2563eb; margin: 0; flex: none; }
+      .linkLabel {
+        flex: 1;
+        min-width: 0;
+        overflow: hidden;
+        text-overflow: ellipsis;
+        white-space: nowrap;
+        font: 11px ui-monospace, SFMono-Regular, Menlo, monospace;
+        color: #374151;
+        cursor: pointer;
+      }
+      .removeLink {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        border: 0;
+        background: transparent;
+        color: #9ca3af;
+        cursor: pointer;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+      .removeLink:hover { color: #ef4444; background: #fef2f2; }
+      .aimBtn {
+        flex: none;
+        width: 26px;
+        height: 26px;
+        border: 0;
+        background: transparent;
+        color: #2563eb;
+        cursor: pointer;
+        border-radius: 6px;
+        display: inline-flex;
+        align-items: center;
+        justify-content: center;
+        padding: 0;
+      }
+      .aimBtn:hover { background: #eff6ff; }
+      .empty {
+        color: #9ca3af;
+        font-size: 11px;
+        padding: 6px 2px 10px;
       }
       .status {
-        color: #4b5563;
-        line-height: 1.45;
-        margin-top: 10px;
+        color: #6b7280;
+        font-size: 11px;
+        line-height: 1.5;
         white-space: pre-wrap;
       }
+      .status.clickable { cursor: pointer; text-decoration: underline; }
+      .actions { display: flex; gap: 8px; margin-top: 12px; }
+      .actions button {
+        border: 0;
+        border-radius: 8px;
+        cursor: pointer;
+        font-weight: 600;
+        font-size: 12px;
+        padding: 9px 12px;
+      }
+      #start { flex: 1.6; background: #2563eb; color: #ffffff; padding: 11px 12px; font-size: 13px; }
+      #start:disabled { opacity: 0.45; cursor: default; }
+      #stop { flex: 1; background: #f3f4f6; color: #111827; }
+      #stop:disabled { opacity: 0.45; cursor: default; }
+      #lang {
+        background: #f3f4f6;
+        color: #111827;
+        display: inline-flex;
+        align-items: center;
+        gap: 5px;
+      }
+      .toast {
+        position: fixed;
+        bottom: -48px;
+        left: 12px;
+        right: 12px;
+        background: #fef2f0;
+        border: 1px solid #fecaca;
+        border-radius: 8px;
+        padding: 10px 14px;
+        font-size: 13px;
+        color: #991b1b;
+        display: flex;
+        align-items: center;
+        gap: 8px;
+        box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+        transition: bottom 0.3s ease, opacity 0.3s ease;
+        opacity: 0;
+        pointer-events: none;
+        z-index: 100;
+      }
+      .toast.show {
+        bottom: 8px;
+        opacity: 1;
+      }
+      .toast svg { flex-shrink: 0; }
     </style>
   </head>
   <body>
-    <div class="row">
-      <button id="toggle">Start polling</button>
-      <button id="clear" class="secondary">Clear queue</button>
-      <button id="render" class="secondary">Render pasted JSON</button>
+    <div class="card">
+      <div class="header">
+        <div class="title" id="appTitle">Writable Figma Bridge</div>
+        <div class="headerRight">
+          <span class="badge" id="badge" data-state="off"><span class="dot"></span><span id="badgeText">未连接</span></span>
+        </div>
+      </div>
+
+      <div class="addRow" id="addRow">
+        <input type="text" id="newLink" placeholder="https://www.figma.com/design/..." />
+        <button class="roundBtn" id="confirmAdd" title="添加">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M20 6L9 17l-5-5"></path></svg>
+        </button>
+        <button class="roundBtn" id="cancelAdd" title="清空">
+          <svg width="11" height="11" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3" stroke-linecap="round" stroke-linejoin="round"><path d="M18 6L6 18M6 6l12 12"></path></svg>
+        </button>
+      </div>
+      <div class="list" id="list"></div>
+      <div class="empty" id="empty"></div>
+
+      <div class="status" id="status"></div>
+      <div class="toast" id="toast">
+        <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="#ef4444" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"/><line x1="15" y1="9" x2="9" y2="15"/><line x1="9" y1="9" x2="15" y2="15"/></svg>
+        <span id="toastText"></span>
+      </div>
+
+      <div class="actions">
+        <button id="start" disabled>开始</button>
+        <button id="stop" disabled>停止</button>
+        <button id="lang">
+          <svg width="12" height="12" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="10"></circle><path d="M2 12h20"></path><path d="M12 2a15.3 15.3 0 0 1 4 10 15.3 15.3 0 0 1-4 10 15.3 15.3 0 0 1-4-10 15.3 15.3 0 0 1 4-10z"></path></svg>
+          <span id="langLabel">EN</span>
+        </button>
+      </div>
     </div>
-    <div class="row">
-      <input type="text" id="fileUrl" placeholder="Figma file URL (optional, identifies this file)" />
-      <input type="text" id="token" placeholder="Server token (optional)" />
-    </div>
-    <div class="status" id="status">Server: http://localhost:8788</div>
-    <textarea id="spec" placeholder="Paste a design spec JSON here for manual testing."></textarea>
 
     <script>
       window.onerror = (message, source, lineno, colno) => {
         const el = document.getElementById("status");
         if (el) el.textContent = `UI error: ${message}\n${source}:${lineno}:${colno}`;
       };
-      const server = "http://localhost:8788";
+      const I18N = {
+        en: {
+          appName: "Writable Figma Bridge",
+          badgeOff: "Disconnected",
+          badgeConnected: "Connected",
+          badgeWriting: "AI writing",
+          badgeReading: "AI reading",
+          badgeDisconnected: "Disconnected",
+          badgeError: "Error",
+          emptyList: "No file links yet. Paste a Figma file URL above to add it.",
+          newLinkPlaceholder: "https://www.figma.com/design/...",
+          addLinkTitle: "Add link",
+          langTitle: "Switch to Chinese",
+          remove: "Delete",
+          serverWaiting: "Server: {url}. Waiting for jobs...",
+          detecting: "Locating server...",
+          serverNotFound: "Server not found (ports 8788-8797). Start it first, then click here to retry.",
+          aiWorking: "AI agent is writing (job {id})...",
+          aiReading: "AI agent is reading (job {id})...",
+          uptime: "Uptime: {time}",
+          authFailed: "Auth failed: the server requires a token (FIGMA_WRITER_TOKEN).",
+          idle: "Idle: {reason}",
+          toastDuplicate: "This link already exists.",
+          start: "Start",
+          stop: "Stop",
+          stopping: "Stopping...",
+          stopped: "Stopped. Queue cleared. Click Start to reconnect.",
+          uiError: "UI error: {msg}",
+          uiPromiseError: "UI promise error: {msg}",
+        },
+        zh: {
+          appName: "Figma 连接器",
+          badgeOff: "未连接",
+          badgeConnected: "已连接",
+          badgeWriting: "AI写入中",
+          badgeReading: "AI读取中",
+          badgeDisconnected: "已断开",
+          badgeError: "异常",
+          emptyList: "在上方输入框粘贴 Figma 文件链接即可添加。",
+          newLinkPlaceholder: "https://www.figma.com/design/...",
+          addLinkTitle: "添加链接",
+          langTitle: "切换到中文",
+          remove: "删除",
+          serverWaiting: "服务地址：{url}，等待任务…",
+          detecting: "正在定位服务…",
+          serverNotFound: "找不到服务（已尝试 8788-8797 端口），请先启动服务，然后点这里重试。",
+          aiWorking: "当前AI写入中…（任务 {id}）",
+          aiReading: "当前AI读取中…（任务 {id}）",
+          uptime: "运行时间：{time}",
+          authFailed: "鉴权失败：服务要求令牌（FIGMA_WRITER_TOKEN）。",
+          idle: "空闲：{reason}",
+          toastDuplicate: "当前链接已存在",
+          start: "开始",
+          stop: "停止",
+          stopping: "正在停止…",
+          stopped: "已停止，队列已清空。点「开始」可重新连接。",
+          uiError: "界面错误：{msg}",
+          uiPromiseError: "界面异步错误：{msg}",
+        },
+      };
+      const DEFAULT_SERVER = "http://localhost:8788";
       const statusEl = document.getElementById("status");
-      const toggleEl = document.getElementById("toggle");
-      const clearEl = document.getElementById("clear");
-      const specEl = document.getElementById("spec");
-      const renderEl = document.getElementById("render");
-      const fileUrlEl = document.getElementById("fileUrl");
-      const tokenEl = document.getElementById("token");
+      const badgeEl = document.getElementById("badge");
+      const badgeTextEl = document.getElementById("badgeText");
+      const startEl = document.getElementById("start");
+      const stopEl = document.getElementById("stop");
+      const langEl = document.getElementById("lang");
+      const langLabelEl = document.getElementById("langLabel");
+      const listEl = document.getElementById("list");
+      const emptyEl = document.getElementById("empty");
+      const newLinkEl = document.getElementById("newLink");
+      const confirmAddEl = document.getElementById("confirmAdd");
+      const cancelAddEl = document.getElementById("cancelAdd");
       // localStorage can throw in Figma's sandboxed plugin iframe; never let it kill the script.
       const safeStorage = {
         get(key) {
@@ -89,31 +332,216 @@
           try { localStorage.setItem(key, value); } catch (error) {}
         },
       };
-      fileUrlEl.value = safeStorage.get("figmaWriterFileUrl") || "";
-      tokenEl.value = safeStorage.get("figmaWriterToken") || "";
-      fileUrlEl.addEventListener("change", () => safeStorage.set("figmaWriterFileUrl", fileUrlEl.value.trim()));
-      tokenEl.addEventListener("change", () => safeStorage.set("figmaWriterToken", tokenEl.value.trim()));
-      function withToken(urlString) {
-        const token = tokenEl.value.trim();
-        if (!token) return urlString;
-        const sep = urlString.indexOf("?") >= 0 ? "&" : "?";
-        return `${urlString}${sep}token=${encodeURIComponent(token)}`;
+      let lang = safeStorage.get("figmaWriterLang") === "en" ? "en" : "zh";
+      function t(key, params) {
+        let text = (I18N[lang] && I18N[lang][key]) || I18N.en[key] || key;
+        if (params) {
+          Object.keys(params).forEach((k) => {
+            text = text.split(`{${k}}`).join(String(params[k]));
+          });
+        }
+        return text;
       }
+
+      // ---- server auto-detection ----
+      let detectedServer = null;
+      async function detectServer() {
+        const saved = (safeStorage.get("figmaWriterServerUrl") || "").trim().replace(/\/+$/, "");
+        const candidates = [];
+        if (saved) candidates.push(saved);
+        for (let p = 8788; p <= 8797; p++) candidates.push(`http://localhost:${p}`);
+        for (const base of candidates) {
+          try {
+            const res = await fetch(`${base}/health`, { method: "GET" });
+            if (res.status === 200 || res.status === 401) return base;
+          } catch (error) {}
+        }
+        return null;
+      }
+      function serverBase() {
+        return detectedServer || DEFAULT_SERVER;
+      }
+
+      // ---- file link list ----
+      let fileUrls = [];
+      try { fileUrls = JSON.parse(safeStorage.get("figmaWriterFileUrls") || "[]"); } catch (error) { fileUrls = []; }
+      let activeFileUrl = safeStorage.get("figmaWriterActiveFileUrl") || "";
+      if (!fileUrls.length) {
+        const legacy = (safeStorage.get("figmaWriterFileUrl") || "").trim();
+        if (legacy) { fileUrls = [legacy]; activeFileUrl = legacy; }
+      }
+      if (activeFileUrl && fileUrls.indexOf(activeFileUrl) < 0) activeFileUrl = fileUrls[0] || "";
+      function saveLinks() {
+        safeStorage.set("figmaWriterFileUrls", JSON.stringify(fileUrls));
+        safeStorage.set("figmaWriterActiveFileUrl", activeFileUrl);
+      }
+      function renderList() {
+        listEl.innerHTML = "";
+        emptyEl.style.display = fileUrls.length ? "none" : "block";
+        emptyEl.textContent = t("emptyList");
+        fileUrls.forEach((url) => {
+          const row = document.createElement("div");
+          row.className = "linkRow" + (url === activeFileUrl ? " active" : "");
+          const radio = document.createElement("input");
+          radio.type = "radio";
+          radio.name = "bridgeFile";
+          radio.checked = url === activeFileUrl;
+          radio.addEventListener("change", () => {
+            activeFileUrl = url;
+            saveLinks();
+            renderList();
+          });
+          const label = document.createElement("span");
+          label.className = "linkLabel";
+          label.textContent = url;
+          label.title = url;
+          label.addEventListener("click", () => {
+            activeFileUrl = url;
+            saveLinks();
+            renderList();
+          });
+          const aim = document.createElement("button");
+          aim.className = "aimBtn";
+          aim.title = "瞄准：跳转到此链接的节点";
+          aim.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="8"></circle><circle cx="12" cy="12" r="3"></circle><line x1="12" y1="1" x2="12" y2="5"></line><line x1="12" y1="19" x2="12" y2="23"></line><line x1="1" y1="12" x2="5" y2="12"></line><line x1="19" y1="12" x2="23" y2="12"></line></svg>';
+          aim.addEventListener("click", () => {
+            parent.postMessage({ pluginMessage: { type: "aim-at-node", url } }, "*");
+          });
+          const remove = document.createElement("button");
+          remove.className = "removeLink";
+          remove.title = t("remove");
+          remove.innerHTML = '<svg width="15" height="15" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18"></path><path d="M8 6V4a2 2 0 0 1 2-2h4a2 2 0 0 1 2 2v2"></path><path d="M19 6l-1 14a2 2 0 0 1-2 2H8a2 2 0 0 1-2-2L5 6"></path><line x1="10" y1="11" x2="10" y2="17"></line><line x1="14" y1="11" x2="14" y2="17"></line></svg>';
+          remove.addEventListener("click", () => {
+            fileUrls = fileUrls.filter((u) => u !== url);
+            if (activeFileUrl === url) activeFileUrl = fileUrls[0] || "";
+            saveLinks();
+            renderList();
+            requestResize();
+          });
+          row.appendChild(radio);
+          row.appendChild(label);
+          row.appendChild(aim);
+          row.appendChild(remove);
+          listEl.appendChild(row);
+        });
+      }
+      cancelAddEl.addEventListener("click", () => {
+        newLinkEl.value = "";
+        newLinkEl.focus();
+      });
+      confirmAddEl.addEventListener("click", () => {
+        const url = newLinkEl.value.trim();
+        if (!url) return;
+        if (fileUrls.indexOf(url) >= 0) {
+          showToast(t("toastDuplicate"));
+          activeFileUrl = url;
+          saveLinks();
+          newLinkEl.value = "";
+          renderList();
+          return;
+        }
+        fileUrls.push(url);
+        activeFileUrl = url;
+        saveLinks();
+        newLinkEl.value = "";
+        renderList();
+        requestResize();
+      });
+
+      // ---- toast notification ----
+      let toastTimer = null;
+      function showToast(msg, duration = 2500) {
+        const el = document.getElementById("toast");
+        document.getElementById("toastText").textContent = msg || "";
+        clearTimeout(toastTimer);
+        el.classList.add("show");
+        toastTimer = setTimeout(() => { el.classList.remove("show"); }, duration);
+      }
+      newLinkEl.addEventListener("keydown", (event) => {
+        if (event.key === "Enter") confirmAddEl.click();
+      });
+
+      // ---- bridge state ----
       let polling = false;
       let timer = null;
       let pollInFlight = false;
+      let pollingStartedAt = null;
+      let uptimeTimer = null;
+      // state.kind: "waiting" | "running" | "error" | "detecting" | "notfound"
+      let state = { kind: "detecting" };
       let pluginInfo = {
         pluginId: `figma-writer-ui-${Date.now()}-${Math.floor(Math.random() * 1000000)}`,
         fileName: "",
         pageName: "",
       };
 
-      function setStatus(text) {
-        statusEl.textContent = text;
+      function fmtUptime() {
+        if (!pollingStartedAt) return "00:00:00";
+        const s = Math.max(0, Math.floor((Date.now() - pollingStartedAt) / 1000));
+        const h = String(Math.floor(s / 3600)).padStart(2, "0");
+        const m = String(Math.floor((s % 3600) / 60)).padStart(2, "0");
+        const sec = String(s % 60).padStart(2, "0");
+        return `${h}:${m}:${sec}`;
+      }
+
+      function classifyOp(spec) {
+        const code = (spec || "").toString();
+        const writeTokens = [
+          "createRectangle", "createEllipse", "createLine", "createText", "createFrame",
+          "createComponent", "createComponentSet", "createPaintStyle", "createTextStyle",
+          "createVariable", "createNode", "appendChild", "insertChild", "remove(", "delete",
+          "clone(", "moveTo", ".resize", "setPluginData", "setVariable", ".characters =",
+          ".name =", ".fills =", ".fillStyleId =", ".effects =", "setRelaunchData",
+        ];
+        return writeTokens.some((t) => code.includes(t)) ? "write" : "read";
+      }
+
+      function setBadge(badgeState, textKey) {
+        badgeEl.dataset.state = badgeState;
+        badgeTextEl.textContent = t(textKey);
+      }
+
+      function renderStatus() {
+        let line1;
+        if (state.kind === "running") {
+          if (state.opKind === "write") {
+            line1 = t("aiWorking", { id: state.jobId });
+            setBadge("writing", "badgeWriting");
+          } else {
+            line1 = t("aiReading", { id: state.jobId });
+            setBadge("reading", "badgeReading");
+          }
+        } else if (state.kind === "notfound" || state.kind === "stopped") {
+          line1 = state.text;
+          setBadge("off", "badgeDisconnected");
+        } else if (state.kind === "error") {
+          line1 = state.text;
+          setBadge("error", "badgeError");
+        } else if (state.kind === "waiting") {
+          line1 = t("serverWaiting", { url: serverBase() });
+          setBadge("connected", "badgeConnected");
+        } else {
+          line1 = t("detecting");
+          setBadge("off", "badgeOff");
+        }
+        const lines = [line1];
+        if (polling) lines.push(t("uptime", { time: fmtUptime() }));
+        statusEl.textContent = lines.join("\n");
+        const clickable = !polling && (state.kind === "notfound" || state.kind === "error" || state.kind === "stopped");
+        statusEl.classList.toggle("clickable", clickable);
+        startEl.disabled = polling || state.kind === "detecting";
+        stopEl.disabled = !polling;
+      }
+
+      function withToken(urlString) {
+        const token = (safeStorage.get("figmaWriterToken") || "").trim();
+        if (!token) return urlString;
+        const sep = urlString.indexOf("?") >= 0 ? "&" : "?";
+        return `${urlString}${sep}token=${encodeURIComponent(token)}`;
       }
 
       async function postResult(id, result) {
-        await fetch(withToken(`${server}/plugin/result`), {
+        await fetch(withToken(`${serverBase()}/plugin/result`), {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify(Object.assign({ id, pluginId: pluginInfo.pluginId }, result)),
@@ -128,23 +556,24 @@
             pluginId: pluginInfo.pluginId,
             fileName: pluginInfo.fileName || "",
             pageName: pluginInfo.pageName || "",
-            fileUrl: fileUrlEl.value.trim(),
+            fileUrl: activeFileUrl || "",
           });
-          const res = await fetch(withToken(`${server}/plugin/job?${params.toString()}`));
+          const res = await fetch(withToken(`${serverBase()}/plugin/job?${params.toString()}`));
           if (res.status === 401) {
-            setStatus("Auth failed: the server requires a token. Enter it in the token field above.");
+            state = { kind: "error", text: t("authFailed") };
+            renderStatus();
             return;
           }
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
           const job = await res.json();
           if (job && job.rejected) {
-            setStatus(`Idle: ${job.reason || "another plugin owns the queue"}`);
+            state = { kind: "error", text: t("idle", { reason: job.reason || "another plugin owns the queue" }) };
           } else if (job && job.id) {
+            state = { kind: "running", jobId: job.id, opKind: classifyOp(job.spec) };
             const toolName = String(job.toolName || "");
             const isRenderJob =
               toolName === "create_figma_canvas_from_spec" ||
               toolName === "create_portfolio_overview_page";
-            setStatus(`${isRenderJob ? "Rendering" : "Running"} job ${job.id} (${job.toolName})...`);
             parent.postMessage(
               {
                 pluginMessage: {
@@ -158,67 +587,80 @@
               "*",
             );
           } else {
-            setStatus(`Polling. Waiting for jobs...\n${new Date().toLocaleTimeString()}`);
+            state = { kind: "waiting" };
           }
+          renderStatus();
         } catch (error) {
-          setStatus(`Polling error: ${error.message}`);
+          state = { kind: "error", text: t("pollError", { msg: error.message }) };
+          renderStatus();
         } finally {
           pollInFlight = false;
           if (polling) timer = setTimeout(poll, 1000);
         }
       }
 
-      function stopPolling(message = "Stopped.") {
-        polling = false;
-        pollInFlight = false;
-        toggleEl.textContent = "Start polling";
-        if (timer) clearTimeout(timer);
-        timer = null;
-        setStatus(message);
-      }
-
-      toggleEl.onclick = () => {
-        if (polling) {
-          stopPolling("Polling stopped.");
+      async function autoStart() {
+        if (polling) return;
+        state = { kind: "detecting" };
+        renderStatus();
+        detectedServer = await detectServer();
+        if (!detectedServer) {
+          state = { kind: "notfound", text: t("serverNotFound") };
+          renderStatus();
           return;
         }
+        safeStorage.set("figmaWriterServerUrl", detectedServer);
         polling = true;
-        toggleEl.textContent = "Stop polling";
-        if (polling) poll();
-      };
+        pollingStartedAt = Date.now();
+        state = { kind: "waiting" };
+        renderStatus();
+        uptimeTimer = setInterval(renderStatus, 1000);
+        poll();
+      }
 
-      clearEl.onclick = async () => {
+      startEl.addEventListener("click", () => {
+        if (!polling) autoStart();
+      });
+
+      stopEl.addEventListener("click", async () => {
+        if (!polling) return;
+        polling = false;
+        pollInFlight = false;
+        if (timer) clearTimeout(timer);
+        timer = null;
+        if (uptimeTimer) clearInterval(uptimeTimer);
+        uptimeTimer = null;
+        pollingStartedAt = null;
         try {
-          stopPolling("Clearing queue...");
-          const res = await fetch(withToken(`${server}/plugin/clear`), { method: "POST" });
+          state = { kind: "stopped", text: t("stopping") };
+          renderStatus();
+          const res = await fetch(withToken(`${serverBase()}/plugin/clear`), { method: "POST" });
           if (!res.ok) throw new Error(`HTTP ${res.status}`);
-          setStatus("Queue cleared. Polling is stopped.");
+          state = { kind: "stopped", text: t("stopped") };
         } catch (error) {
-          setStatus(`Clear queue error: ${error.message}`);
+          state = { kind: "stopped", text: t("stopped") };
         }
-      };
+        renderStatus();
+      });
 
-      renderEl.onclick = () => {
-        try {
-          const spec = JSON.parse(specEl.value);
-          parent.postMessage(
-            { pluginMessage: { type: "render-spec", id: "manual", spec } },
-            "*",
-          );
-        } catch (error) {
-          setStatus(`Invalid JSON: ${error.message}`);
-        }
-      };
+      statusEl.addEventListener("click", () => {
+        if (!polling && (state.kind === "notfound" || state.kind === "error" || state.kind === "stopped")) autoStart();
+      });
 
       window.onmessage = async (event) => {
         const message = event.data.pluginMessage;
         if (!message) return;
+        if (message.type === "aim-result") {
+          statusEl.textContent = message.message;
+          statusEl.classList.remove("clickable");
+          return;
+        }
         if (message.type === "bridge-info") {
           pluginInfo.pluginId = message.pluginId || pluginInfo.pluginId;
           pluginInfo.fileName = message.fileName || "";
           pluginInfo.pageName = message.pageName || "";
+          return;
         }
-        setStatus(message.message || JSON.stringify(message));
         if (message.id && message.id !== "manual") {
           await postResult(message.id, {
             ok: message.ok,
@@ -230,18 +672,59 @@
       };
 
       window.onerror = (message, source, lineno, colno) => {
-        setStatus(`UI error: ${message}\n${source}:${lineno}:${colno}`);
+        statusEl.textContent = `${t("uiError", { msg: message })}\n${source}:${lineno}:${colno}`;
       };
 
       window.onunhandledrejection = (event) => {
         const reason = event.reason && event.reason.message ? event.reason.message : event.reason;
-        setStatus(`UI promise error: ${reason}`);
+        statusEl.textContent = t("uiPromiseError", { msg: reason });
       };
 
       window.addEventListener("beforeunload", () => {
         if (timer) clearTimeout(timer);
+        if (uptimeTimer) clearInterval(uptimeTimer);
         polling = false;
       });
+
+      // Keep the plugin window sized to its content.
+      function requestResize() {
+        parent.postMessage(
+          {
+            pluginMessage: {
+              type: "resize",
+              width: Math.ceil(document.body.scrollWidth),
+              height: Math.ceil(document.body.scrollHeight),
+            },
+          },
+          "*",
+        );
+      }
+      if (typeof ResizeObserver !== "undefined") {
+        new ResizeObserver(requestResize).observe(document.body);
+      }
+      window.addEventListener("load", requestResize);
+
+      function applyLang() {
+        document.getElementById("appTitle").textContent = t("appName");
+        startEl.textContent = t("start");
+        stopEl.textContent = t("stop");
+        langLabelEl.textContent = lang === "zh" ? "EN" : "中";
+        newLinkEl.placeholder = t("newLinkPlaceholder");
+      }
+      langEl.addEventListener("click", () => {
+        lang = lang === "zh" ? "en" : "zh";
+        safeStorage.set("figmaWriterLang", lang);
+        applyLang();
+        renderList();
+        renderStatus();
+        requestResize();
+      });
+
+      applyLang();
+      renderList();
+      renderStatus();
+      autoStart();
+      requestResize();
     </script>
   </body>
 </html>

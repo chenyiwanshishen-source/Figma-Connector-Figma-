@@ -1,6 +1,6 @@
 {
-  "name": "Writable Figma MCP Bridge V2",
-  "id": "writable-figma-mcp-bridge-v2",
+  "name": "Writable Figma MCP Bridge",
+  "id": "writable-figma-mcp-bridge",
   "api": "1.0.0",
   "main": "code.js",
   "ui": "ui.html",
