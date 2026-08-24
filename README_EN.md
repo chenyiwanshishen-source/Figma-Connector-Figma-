@@ -8,12 +8,9 @@
 
 ## 1. What problem does this solve?
 
-Existing AI ↔ Figma solutions fall into two categories:
+Existing AI ↔ Figma solutions are mostly **read-only** (official MCP, Dev Mode) — they can parse and read, but cannot edit designs.
 
-1. **Read-only** (official MCP, Dev Mode) — can only parse/read, cannot edit designs.
-2. **Product-specific built-in** (Claude Desktop, Codex, etc.) — some support writing but are tied to a specific product, and usually lack **in-plugin visual interaction** (status display, link management, aim-to-node, etc.).
-
-**Writable Figma MCP Bridge** takes a third path: a **universal, writable Figma bridge** — not tied to any single AI product, usable by any client that can send MCP requests; ships with its own Figma plugin panel for visual status and operations.
+**Figma Connector** is a **universal, writable Figma bridge** — not tied to any single AI product, usable by any client that can send MCP requests; ships with its own Figma plugin panel for visual status and operations.
 - **What if it breaks something?** Every write snapshots the document first; if a job throws, newly created nodes are auto-removed (rollback).
 - **How does the AI know which file to operate on?** Paste a Figma file link in the plugin panel and mark it active; the plugin reports that file identity to the server while polling so the agent can read/write accordingly.
 - **How to jump to a node?** Each link row has an "Aim" button that parses the `node-id`, switches to the node's page, zooms to fit, and selects it.
